@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { verifyAccessTokenEdge } from "@/lib/auth/jwt-edge";
 
-export function middleware(request) {
+export async function middleware(request) {
     const { pathname } = request.nextUrl;
-    console.log("MIDDLEWARE HIT:", pathname);
 
     const publicPaths = [
         "/login",
@@ -28,7 +27,20 @@ export function middleware(request) {
     }
 
     try {
-        verifyAccessToken(token);
+        const { payload } = await verifyAccessTokenEdge(token);
+        const userRole = payload.role;
+
+        const isAdminRoute =
+            pathname.startsWith("/admin") ||
+            pathname.startsWith("/api/protected/admin");
+
+        if (isAdminRoute && userRole !== "admin") {
+            return NextResponse.json(
+                { error: "Forbidden: Admins only" },
+                { status: 403 }
+            );
+        }
+
         return NextResponse.next();
     } catch {
         return NextResponse.json(
