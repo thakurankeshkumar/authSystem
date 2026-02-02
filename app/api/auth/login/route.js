@@ -27,6 +27,14 @@ export async function POST(req) {
       );
     }
 
+    if (!user.isEmailVerified) {
+      return Response.json(
+        { error: "Please verify your email" },
+        { status: 403 }
+      );
+    }
+
+
     const isValid = await argon2.verify(user.passwordHash, password);
     if (!isValid) {
       return Response.json(
