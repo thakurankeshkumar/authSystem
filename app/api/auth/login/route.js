@@ -47,7 +47,9 @@ export async function POST(req) {
     const accessToken = signAccessToken({
       userId: user._id,
       role: user.role,
+      isEmailVerified: user.isEmailVerified,
     });
+
 
     // 🔁 Create refresh token
     const refreshToken = generateRefreshToken();

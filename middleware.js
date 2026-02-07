@@ -1,59 +1,54 @@
 import { NextResponse } from "next/server";
-import { verifyAccessTokenEdge } from "@/lib/auth/jwt-edge";
+import { verifyAccessToken } from "@/lib/auth/jwt";
 
-export async function middleware(request) {
-    const { pathname } = request.nextUrl;
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
 
-    const publicPaths = [
-        "/login",
-        "/register",
-        "/api/auth/login",
-        "/api/auth/register",
-        "/api/auth/refresh",
-        "/api/auth/logout",
-    ];
+  const publicPaths = [
+    "/login",
+    "/register",
+    "/verify-email",
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/verify-email",
+    "/api/auth/resend-verification",
+    "/api/auth/logout",
+  ];
 
-    if (publicPaths.some((path) => pathname.startsWith(path))) {
-        return NextResponse.next();
+  if (publicPaths.some((path) => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  const token = request.cookies.get("access_token")?.value;
+
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const payload = verifyAccessToken(token);
+
+    // 🔴 NEW: enforce email verification
+    if (!payload.isEmailVerified) {
+      return NextResponse.json(
+        { error: "Email not verified" },
+        { status: 403 }
+      );
     }
 
-    const token = request.cookies.get("access_token")?.value;
-
-    if (!token) {
-        return NextResponse.json(
-            { error: "Unauthorized" },
-            { status: 401 }
-        );
-    }
-
-    try {
-        const { payload } = await verifyAccessTokenEdge(token);
-        const userRole = payload.role;
-
-        const isAdminRoute =
-            pathname.startsWith("/admin") ||
-            pathname.startsWith("/api/protected/admin");
-
-        if (isAdminRoute && userRole !== "admin") {
-            return NextResponse.json(
-                { error: "Forbidden: Admins only" },
-                { status: 403 }
-            );
-        }
-
-        return NextResponse.next();
-    } catch {
-        return NextResponse.json(
-            { error: "Invalid or expired token" },
-            { status: 401 }
-        );
-    }
+    return NextResponse.next();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid or expired token" },
+      { status: 401 }
+    );
+  }
 }
 
 export const config = {
-    matcher: [
-        "/dashboard/:path*",
-        "/admin/:path*",
-        "/api/protected/:path*",
-    ],
+  matcher: [
+    "/dashboard/:path*",
+    "/admin/:path*",
+    "/api/protected/:path*",
+  ],
 };

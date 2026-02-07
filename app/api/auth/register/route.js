@@ -3,6 +3,7 @@ import User from "@/lib/db/models/User";
 import argon2 from "argon2";
 import EmailVerificationToken from "@/lib/db/models/EmailVerificationToken";
 import { generateEmailToken, hashEmailToken } from "@/lib/auth/email-token";
+import { sendEmail } from "@/lib/email/mailer";
 
 export async function POST(req) {
   try {
@@ -34,13 +35,13 @@ export async function POST(req) {
 
     const passwordHash = await argon2.hash(password);
 
-    // ✅ FIX: capture user
     const user = await User.create({
       email,
       passwordHash,
       isEmailVerified: false,
     });
 
+    // 🔑 Create verification token
     const emailToken = generateEmailToken();
     const emailTokenHash = await hashEmailToken(emailToken);
 
@@ -50,9 +51,21 @@ export async function POST(req) {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
     });
 
-    console.log(
-      `Verify email: http://localhost:3000/api/auth/verify-email?token=${emailToken}&userId=${user._id}`
-    );
+    // 🔗 Verification link
+    const verifyUrl = `${process.env.APP_URL}/api/auth/verify-email?token=${emailToken}&userId=${user._id}`;
+
+    // 📧 SEND EMAIL (THIS WAS MISSING)
+    await sendEmail({
+      to: user.email, // ✅ send to the user
+      subject: "Verify your email",
+      html: `
+        <h2>Verify your email</h2>
+        <p>Click the link below to verify your account:</p>
+        <a href="${verifyUrl}">${verifyUrl}</a>
+      `,
+    });
+
+    console.log("REGISTER EMAIL SENT TO:", user.email);
 
     return Response.json(
       { message: "User registered successfully. Please verify your email." },
